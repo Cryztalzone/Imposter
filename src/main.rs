@@ -187,46 +187,55 @@ async fn echo(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 }
 
 #[command]
+#[description = "Repeats your message with TTS"]
 async fn say(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Deletes your message, then repeats it with TTS (leaves no trace of the author)"]
 async fn whisper(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Tests the bots latency"]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Check if the bot is active"]
 async fn active(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Shows a changelog"]
 async fn changelog(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Shows the avatar of a user"]
 async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Reads your input in ICAO code"]
 async fn code(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Counts from one number to another with x seconds of delay"]
 async fn count(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
 #[command]
+#[description = "Current indev command (owner only)"]
 async fn debug(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
