@@ -180,6 +180,7 @@ async fn main() {
 }
 
 #[command]
+#[description = "Repeats your message"]
 async fn echo(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     msg.channel_id.say(&ctx.http, &args.rest()).await?;
     Ok(())
