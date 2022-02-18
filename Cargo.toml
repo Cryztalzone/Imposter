@@ -1,0 +1,19 @@
+[package]
+name = "imposter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.15.0", features = ["full"] }
+serde_json = "1.0.73"
+serde = { version = "1.0.104", features = ["derive"] }
+
+#[dependencies.reqwest]
+#features = ["json"]
+#version = "0.11.8"
+
+[dependencies.serenity]
+#features = ["unstable_discord_api"]
+version = "0.10.10"
