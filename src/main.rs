@@ -3,15 +3,19 @@ use std::{
     io,
     io::BufReader,
     fs::File,
+    time::SystemTime,
 };
-
+use chrono::{DateTime, Duration, Utc};
 use serenity::{
     prelude::*,
     async_trait,
     client::bridge::gateway::GatewayIntents,
     model::{
         channel::{Channel, Message},
-        gateway::Ready,
+        gateway::{
+            Ready,
+            Activity,
+        },
         id::UserId,
         permissions::Permissions,
     },
@@ -56,7 +60,8 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        ctx.dnd().await;
+        ctx.set_activity(Activity::watching("-help @ Version Alpha 2.0")).await;
+        //ctx.dnd().await;
         println!("Successfully connected {}", ready.user.name);
     }
 }
@@ -65,35 +70,35 @@ impl EventHandler for Handler {
 struct General;
 
 #[group]
-#[prefixes("text")]
+//#[prefixes("text")]
 #[description("A group with commands that make the bot repeat text")]
-#[default_command(echo)]
+//#[default_command(echo)]
 #[commands(echo, say, whisper)]
 struct Text;
 
 #[group]
-#[prefixes("test")]
+//#[prefixes("test")]
 #[description("A group with commands to test the bot")]
-#[default_command(ping)]
+//#[default_command(ping)]
 #[commands(active, ping)]
 struct Test;
 
 #[group]
-#[prefixes("util")]
+//#[prefixes("util")]
 #[description("A group with utility commands")]
-#[default_command(changelog)]
+//#[default_command(changelog)]
 #[commands(avatar, changelog, code, count)]
 struct Util;
 
 #[group]
 #[owners_only]
-#[prefixes("debug")]
+//#[prefixes("debug")]
 #[description("Debug commands")]
 #[commands(debug)]
 struct Debug;
 
 #[help]
-#[command_not_found_text = "Konnte '{}' nicht finden."]
+#[command_not_found_text = "Could not find '{}'"]
 #[indention_prefix = "+"]
 #[lacking_permissions = "Hide"]
 #[wrong_channel = "Strike"]
@@ -188,25 +193,38 @@ async fn echo(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 
 #[command]
 #[description = "Repeats your message with TTS"]
-async fn say(ctx: &Context, msg: &Message) -> CommandResult {
+async fn say(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    msg.channel_id.send_message(&ctx.http, |m| {
+        m.content(&args.rest());
+        m.tts(true);
+
+        m
+    })
+    .await?;
     Ok(())
 }
 
 #[command]
 #[description = "Deletes your message, then repeats it with TTS (leaves no trace of the author)"]
-async fn whisper(ctx: &Context, msg: &Message) -> CommandResult {
+async fn whisper(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    msg.delete(&ctx.http).await?;
+    say(&ctx, &msg, args).await?;
     Ok(())
 }
 
 #[command]
 #[description = "Tests the bots latency"]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
+    println!("{}, {}", msg.timestamp, Utc::now());
+    msg.channel_id.say(&ctx.http, "Pong, this message took ".to_owned() + &DateTime::signed_duration_since(msg.timestamp, Utc::now()).num_milliseconds().to_string() + &"ms".to_owned()).await?;
+    
     Ok(())
 }
 
 #[command]
 #[description = "Check if the bot is active"]
 async fn active(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.channel_id.say(&ctx.http, "I am here and listening for your commands").await?;
     Ok(())
 }
 
