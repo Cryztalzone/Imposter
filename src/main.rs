@@ -11,7 +11,7 @@ use serenity::{
     async_trait,
     client::bridge::gateway::GatewayIntents,
     model::{
-        channel::{Channel, Message},
+        channel::{Channel, Message, Embed, EmbedField},
         gateway::{
             Ready,
             Activity,
@@ -36,6 +36,7 @@ use serenity::{
         },
     },
     http::Http,
+    utils::Colour,
 };
 
 use serde::Deserialize;
@@ -52,7 +53,8 @@ fn get_config() -> io::Result<Config> {
 #[derive(Deserialize, Debug)]
 struct Config {
     token: String,
-    application_id: u64
+    application_id: u64,
+    version: String,
 }
 
 struct Handler;
@@ -87,7 +89,7 @@ struct Test;
 //#[prefixes("util")]
 #[description("A group with utility commands")]
 //#[default_command(changelog)]
-#[commands(avatar, changelog, code, count)]
+#[commands(avatar, default_avatar, changelog, code, count)]
 struct Util;
 
 #[group]
@@ -187,20 +189,26 @@ async fn main() {
 #[command]
 #[description = "Repeats your message"]
 async fn echo(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    msg.channel_id.say(&ctx.http, &args.rest()).await?;
+    if args.is_empty() {
+        msg.channel_id.say(&ctx.http, "Cannot send an empty message").await?;
+    } else {
+        msg.channel_id.say(&ctx.http, &args.rest()).await?;
+    }
     Ok(())
 }
 
 #[command]
 #[description = "Repeats your message with TTS"]
 async fn say(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    msg.channel_id.send_message(&ctx.http, |m| {
-        m.content(&args.rest());
-        m.tts(true);
-
+    if args.is_empty() {
+        msg.channel_id.say(&ctx.http, "Cannot send an empty message").await?;
+    } else {
+        msg.channel_id.send_message(&ctx.http, |m| {
+            m.content(&args.rest());
+            m.tts(true);
         m
-    })
-    .await?;
+        }).await?;
+    }
     Ok(())
 }
 
@@ -208,7 +216,11 @@ async fn say(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[description = "Deletes your message, then repeats it with TTS (leaves no trace of the author)"]
 async fn whisper(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     msg.delete(&ctx.http).await?;
-    say(&ctx, &msg, args).await?;
+    if args.is_empty() {
+        msg.channel_id.say(&ctx.http, "Cannot send an empty message").await?;
+    } else {
+        say(&ctx, &msg, args).await?;
+    }
     Ok(())
 }
 
@@ -216,7 +228,7 @@ async fn whisper(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[description = "Tests the bots latency"]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     println!("{}, {}", msg.timestamp, Utc::now());
-    msg.channel_id.say(&ctx.http, "Pong, this message took ".to_owned() + &DateTime::signed_duration_since(msg.timestamp, Utc::now()).num_milliseconds().to_string() + &"ms".to_owned()).await?;
+    msg.channel_id.say(&ctx.http, "Pong, this message took ".to_owned() + &DateTime::signed_duration_since(Utc::now(), msg.timestamp).num_milliseconds().to_string() + &"ms".to_owned()).await?;
     
     Ok(())
 }
@@ -230,19 +242,112 @@ async fn active(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[description = "Shows a changelog"]
-async fn changelog(ctx: &Context, msg: &Message) -> CommandResult {
+async fn changelog(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let f: (&str, &str);
+    let version = if args.is_empty() {
+        let config = get_config().expect("Error reading bot version from config");
+        config.version
+    } else {
+        args.single::<String>().unwrap()
+    };
+    match version.as_str() {
+        "2.0" => f = ("Version 2.0", "The entire bot was rewritten in Rust, the commands work slightly different but should all produce the same results"),
+        _ => f = ("Unknown Version", "This version does not exist. Valid versions are:\n2.0"),
+    }
+    msg.channel_id.send_message(&ctx.http, |m| {
+        m.embed(|e| {
+            e.color(Colour(0xC27C0E));
+            e.description("To get a changelog from a prior version (back to 2.0) pass the version number as an argument to this command.");
+            e.field(f.0, f.1, true);
+            e
+        });
+        m
+    }).await?;
     Ok(())
 }
 
 #[command]
 #[description = "Shows the avatar of a user"]
 async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut url: String = "Something went wrong, please try again".to_string();
+    if msg.mentions.is_empty() {
+        match msg.author.avatar_url() {
+            Some(avatar) => url = avatar,
+            None => url = msg.author.default_avatar_url(),
+        }
+    } else {
+        match msg.mentions[0].avatar_url() {
+            Some(avatar) => url = avatar,
+            None => url = msg.mentions[0].default_avatar_url(),
+        };
+    }
+    msg.channel_id.say(&ctx.http, url).await?;
+    Ok(())
+}
+
+#[command]
+#[description = "Shows the default avatar of a user"]
+async fn default_avatar(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut url: String = "Something went wrong, please try again".to_string();
+    if msg.mentions.is_empty() {
+        url = msg.author.default_avatar_url();
+    } else {
+        url = msg.mentions[0].default_avatar_url();
+    }
+    msg.channel_id.say(&ctx.http, url).await?;
     Ok(())
 }
 
 #[command]
 #[description = "Reads your input in ICAO code"]
-async fn code(ctx: &Context, msg: &Message) -> CommandResult {
+async fn code(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let mut output = "".to_string();
+    for c in args.rest().to_uppercase().chars() {
+        match c {
+            'A' => output.push_str("Alpha"),
+            'B' => output.push_str("Bravo"),
+            'C' => output.push_str("Charlie"),
+            'D' => output.push_str("Delta"),
+            'E' => output.push_str("Echo"),
+            'F' => output.push_str("Foxtrott"),
+            'G' => output.push_str("Golf"),
+            'H' => output.push_str("Hotel"),
+            'I' => output.push_str("India"),
+            'J' => output.push_str("Juliet"),
+            'K' => output.push_str("Kilo"),
+            'L' => output.push_str("Lima"),
+            'M' => output.push_str("Mike"),
+            'N' => output.push_str("November"),
+            'O' => output.push_str("Oskar"),
+            'P' => output.push_str("Papa"),
+            'Q' => output.push_str("Quebec"),
+            'R' => output.push_str("Romeo"),
+            'S' => output.push_str("Sierra"),
+            'T' => output.push_str("Tango"),
+            'U' => output.push_str("Uniform"),
+            'V' => output.push_str("Victor"),
+            'W' => output.push_str("Whiskey"),
+            'X' => output.push_str("X-Ray"),
+            'Y' => output.push_str("Yankee"),
+            'Z' => output.push_str("Zulu"),
+            '1' => output.push_str("One"),
+            '2' => output.push_str("Two"),
+            '3' => output.push_str("Three"),
+            '4' => output.push_str("Four"),
+            '5' => output.push_str("Five"),
+            '6' => output.push_str("Six"),
+            '7' => output.push_str("Seven"),
+            '8' => output.push_str("Eight"),
+            '9' => output.push_str("Nine"),
+            '0' => output.push_str("Ten"),
+            '.' => output.push_str("Stop"),
+            _ => output.push(c),
+        }
+        output.push_str(", ");
+    }
+    output.pop();
+    output.pop();
+    msg.channel_id.say(&ctx.http, output).await?;
     Ok(())
 }
 
