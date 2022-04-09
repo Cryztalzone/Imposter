@@ -3,8 +3,11 @@ use std::{
     io,
     io::BufReader,
     fs::File,
+    time,
     time::SystemTime,
+    thread,
 };
+use async_std::task;
 use chrono::{DateTime, Duration, Utc};
 use serenity::{
     prelude::*,
@@ -89,7 +92,7 @@ struct Test;
 //#[prefixes("util")]
 #[description("A group with utility commands")]
 //#[default_command(changelog)]
-#[commands(avatar, default_avatar, changelog, code, count)]
+#[commands(avatar, changelog, code, count)]
 struct Util;
 
 #[group]
@@ -213,6 +216,7 @@ async fn say(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 }
 
 #[command]
+#[only_in(guilds)]
 #[description = "Deletes your message, then repeats it with TTS (leaves no trace of the author)"]
 async fn whisper(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     msg.delete(&ctx.http).await?;
@@ -268,6 +272,7 @@ async fn changelog(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 
 #[command]
 #[description = "Shows the avatar of a user"]
+#[sub_commands(default)]
 async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
     let mut url: String = "Something went wrong, please try again".to_string();
     if msg.mentions.is_empty() {
@@ -287,7 +292,7 @@ async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[description = "Shows the default avatar of a user"]
-async fn default_avatar(ctx: &Context, msg: &Message) -> CommandResult {
+async fn default(ctx: &Context, msg: &Message) -> CommandResult {
     let mut url: String = "Something went wrong, please try again".to_string();
     if msg.mentions.is_empty() {
         url = msg.author.default_avatar_url();
@@ -347,13 +352,39 @@ async fn code(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     }
     output.pop();
     output.pop();
-    msg.channel_id.say(&ctx.http, output).await?;
+    msg.channel_id.send_message(&ctx.http, |m| {
+        m.content(output);
+        m.tts(true);
+        m
+    }).await?;
     Ok(())
 }
 
 #[command]
 #[description = "Counts from one number to another with x seconds of delay"]
-async fn count(ctx: &Context, msg: &Message) -> CommandResult {
+async fn count(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let mut values: Vec<u32> = Vec::new();
+    let mut is_error = false;
+    if args.len() < 3 {
+        msg.channel_id.say(&ctx.http, "Not enough arguments or incorrect syntax. Use '-count start, end, delay'").await?;
+    } else {
+        for arg in args.iter::<u32>() {
+            match arg {
+                Ok(num) => values.append(&mut vec![num]),
+                Err(_reason) => is_error = true,
+            }
+        }
+        if is_error {
+            msg.channel_id.say(&ctx.http, "One of the arguments is not a valid number, please try again").await?;
+        }
+    }
+
+    println!("{:?}", values);
+    for x in values[0]..values[1] {
+        msg.channel_id.say(&ctx.http, x).await;
+        task::sleep(time::Duration::from_secs(values[2].into())).await;
+    }
+
     Ok(())
 }
 
