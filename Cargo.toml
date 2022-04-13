@@ -14,3 +14,4 @@ async-std = "1.11.0"
 
 [dependencies.serenity]
 version = "0.10.10"
+features = ["collector"]

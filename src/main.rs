@@ -7,7 +7,10 @@ use std::{
     time::SystemTime,
     thread,
 };
-use async_std::task;
+use async_std::{
+    task,
+    stream::Stream,
+};
 use chrono::{DateTime, Duration, Utc};
 use serenity::{
     prelude::*,
@@ -19,7 +22,10 @@ use serenity::{
             Ready,
             Activity,
         },
-        id::UserId,
+        id::{
+            UserId,
+            ChannelId,
+        },
         permissions::Permissions,
     },
     framework::standard::{
@@ -66,7 +72,6 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         ctx.set_activity(Activity::watching("-help @ Version Alpha 2.0")).await;
-        //ctx.dnd().await;
         println!("Successfully connected {}", ready.user.name);
     }
 }
@@ -75,32 +80,19 @@ impl EventHandler for Handler {
 struct General;
 
 #[group]
-//#[prefixes("text")]
 #[description("A group with commands that make the bot repeat text")]
-//#[default_command(echo)]
 #[commands(echo, say, whisper)]
 struct Text;
 
 #[group]
-//#[prefixes("test")]
 #[description("A group with commands to test the bot")]
-//#[default_command(ping)]
 #[commands(active, ping)]
 struct Test;
 
 #[group]
-//#[prefixes("util")]
 #[description("A group with utility commands")]
-//#[default_command(changelog)]
-#[commands(avatar, changelog, code, count)]
+#[commands(avatar, changelog, code/*, count*/)]
 struct Util;
-
-#[group]
-#[owners_only]
-//#[prefixes("debug")]
-#[description("Debug commands")]
-#[commands(debug)]
-struct Debug;
 
 #[help]
 #[command_not_found_text = "Could not find '{}'"]
@@ -172,8 +164,7 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .group(&TEXT_GROUP)
         .group(&TEST_GROUP)
-        .group(&UTIL_GROUP)
-        .group(&DEBUG_GROUP);
+        .group(&UTIL_GROUP);
 
     // Login with a bot token
     let mut client = Client::builder(&config.token)
@@ -255,7 +246,7 @@ async fn changelog(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
         args.single::<String>().unwrap()
     };
     match version.as_str() {
-        "2.0" => f = ("Version 2.0", "The entire bot was rewritten in Rust, the commands work slightly different but should all produce the same results"),
+        "2.0" => f = ("Version 2.0", "The entire bot was rewritten in Rust, the commands work slightly different but should all produce the same results\n-count is currently unavailable as development is temporarily suspended"),
         _ => f = ("Unknown Version", "This version does not exist. Valid versions are:\n2.0"),
     }
     msg.channel_id.send_message(&ctx.http, |m| {
@@ -360,6 +351,8 @@ async fn code(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     Ok(())
 }
 
+// Development currently suspended
+/*
 #[command]
 #[description = "Counts from one number to another with x seconds of delay"]
 async fn count(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
@@ -367,6 +360,7 @@ async fn count(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let mut is_error = false;
     if args.len() < 3 {
         msg.channel_id.say(&ctx.http, "Not enough arguments or incorrect syntax. Use '-count start, end, delay'").await?;
+        return Ok(())
     } else {
         for arg in args.iter::<u32>() {
             match arg {
@@ -376,20 +370,19 @@ async fn count(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         }
         if is_error {
             msg.channel_id.say(&ctx.http, "One of the arguments is not a valid number, please try again").await?;
+            return Ok(())
         }
     }
 
     println!("{:?}", values);
-    for x in values[0]..values[1] {
+    for x in values[0]..values[1]+1 {
         msg.channel_id.say(&ctx.http, x).await;
+        let collector = msg.channel_id.await_replies(&ctx.shard).timeout(time::Duration::from_secs(values[2].into()));
         task::sleep(time::Duration::from_secs(values[2].into())).await;
+        let msgs = collector.await;
+        println!("{:?}", msgs.size_hint());
     }
 
     Ok(())
 }
-
-#[command]
-#[description = "Current indev command (owner only)"]
-async fn debug(ctx: &Context, msg: &Message) -> CommandResult {
-    Ok(())
-}
+*/
